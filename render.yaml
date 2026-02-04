@@ -11,6 +11,8 @@ services:
         sync: false
       - key: SUPPORT_CHAT_ID
         sync: false
+      - key: ALLOWED_CHAT_ID
+        sync: false
       - key: PORT
         value: 10000
     healthCheckPath: /health
