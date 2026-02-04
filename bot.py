@@ -44,7 +44,7 @@ except:
 
 # ID чата, где должен работать бот (модерация)
 try:
-    ALLOWED_CHAT_ID = int(os.getenv("ALLOWED_CHAT_ID", "-1003559804187"))
+    ALLOWED_CHAT_ID = int(os.getenv("ALLOWED_CHAT_ID", "-1003697245572"))
 except:
     ALLOWED_CHAT_ID = -1003559804187
 
