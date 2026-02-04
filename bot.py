@@ -26,14 +26,22 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Токен бота (ЗАМЕНИ НА СВОЙ!)
-BOT_TOKEN = os.getenv("BOT_TOKEN", "7474851897:AAEQo0Rsos8zHofVtB-YFU8kEFx1FJJqNDY")
+# Токен бота (получаем из переменных окружения)
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+if not BOT_TOKEN:
+    raise ValueError("BOT_TOKEN не установлен! Добавь его в Environment Variables на Render")
 
-# ID владельца бота (ЗАМЕНИ НА СВОЙ!)
-BOT_OWNER_ID = int(os.getenv("BOT_OWNER_ID", "6493670021"))
+# ID владельца бота
+try:
+    BOT_OWNER_ID = int(os.getenv("BOT_OWNER_ID", "6493670021"))
+except:
+    BOT_OWNER_ID = 6493670021  # твой ID по умолчанию
 
-# ID чата для обращений (ЗАМЕНИ НА СВОЙ!)
-SUPPORT_CHAT_ID = int(os.getenv("SUPPORT_CHAT_ID", "-1003559804187"))
+# ID чата для обращений
+try:
+    SUPPORT_CHAT_ID = int(os.getenv("SUPPORT_CHAT_ID", "-1003559804187"))
+except:
+    SUPPORT_CHAT_ID = -1003559804187
 
 # Порт для Render
 PORT = int(os.getenv("PORT", 10000))
@@ -1166,4 +1174,5 @@ async def main():
 
 
 if __name__ == "__main__":
+
     asyncio.run(main())
