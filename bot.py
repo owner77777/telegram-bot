@@ -1,4 +1,3 @@
-#bot.py
 import os
 import logging
 import asyncio
@@ -12,8 +11,8 @@ from aiogram.types import (
     KeyboardButton, ReplyKeyboardRemove
 )
 from aiogram.enums import ChatMemberStatus, ChatType, ParseMode
-from aiogram.exceptions import TelegramBadRequest, TelegramForbiddenError
-from aiogram.filters import Command, CommandObject, StateFilter
+from aiogram.exceptions import TelegramBadRequest
+from aiogram.filters import Command, CommandObject
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.storage.memory import MemoryStorage
@@ -35,13 +34,16 @@ if not BOT_TOKEN:
 try:
     BOT_OWNER_ID = int(os.getenv("BOT_OWNER_ID", "6493670021"))
 except:
-    BOT_OWNER_ID = 6493670021  # твой ID по умолчанию
+    BOT_OWNER_ID = 6493670021
 
 # ID чата для обращений
 try:
     SUPPORT_CHAT_ID = int(os.getenv("SUPPORT_CHAT_ID", "-1003559804187"))
 except:
     SUPPORT_CHAT_ID = -1003559804187
+
+# ID разрешенного чата (ЗАМЕНИ НА ID СВОЕГО ЧАТА!)
+ALLOWED_CHAT_ID = int(os.getenv("ALLOWED_CHAT_ID", "-1002287799491"))  # Замени на ID своего чата!
 
 # Порт для Render
 PORT = int(os.getenv("PORT", 10000))
@@ -71,7 +73,6 @@ def init_db():
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
 
-    # Таблица для предупреждений
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS user_warns (
             chat_id INTEGER,
@@ -81,7 +82,6 @@ def init_db():
         )
     ''')
 
-    # Таблица для сообщения владельца
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS owner_message (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -90,7 +90,6 @@ def init_db():
         )
     ''')
 
-    # Таблица для обращений
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS support_tickets (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -109,7 +108,6 @@ def init_db():
         )
     ''')
 
-    # Индексы для быстрого поиска
     cursor.execute('CREATE INDEX IF NOT EXISTS idx_user_warns ON user_warns(chat_id, user_id)')
     cursor.execute('CREATE INDEX IF NOT EXISTS idx_support_tickets ON support_tickets(user_id, status)')
 
@@ -251,17 +249,25 @@ def get_ticket_by_id(ticket_id: int) -> Optional[tuple]:
     return result
 
 
+# Проверка разрешенного чата
+async def is_allowed_chat(chat_id: int) -> bool:
+    """Проверяет, разрешен ли этот чат для бота"""
+    return chat_id == ALLOWED_CHAT_ID
+
+
 async def silent_delete_service_messages(message: types.Message):
     """Тихо удаляет служебные сообщения о входе/выходе"""
+    if not await is_allowed_chat(message.chat.id):
+        return
+    
     try:
-        # Проверяем, является ли сообщение служебным
         is_service_message = (
-                message.new_chat_members or
-                message.left_chat_member or
-                message.group_chat_created or
-                message.migrate_from_chat_id or
-                message.migrate_to_chat_id or
-                message.pinned_message
+            message.new_chat_members or
+            message.left_chat_member or
+            message.group_chat_created or
+            message.migrate_from_chat_id or
+            message.migrate_to_chat_id or
+            message.pinned_message
         )
 
         if is_service_message:
@@ -286,13 +292,11 @@ async def get_target_user(message: types.Message, command: CommandObject) -> tup
     # Если команда вызвана как ответ на сообщение
     if message.reply_to_message and message.reply_to_message.from_user:
         target_user = message.reply_to_message.from_user
-        # Причина - все аргументы после команды
         reason = args.strip()
         return target_user, reason or "Без указания причины"
 
     # Если указаны аргументы
     if args:
-        # Разделяем первый аргумент (идентификатор) и остальное (причина)
         parts = args.split(maxsplit=1)
         identifier = parts[0].strip()
         reason = parts[1].strip() if len(parts) > 1 else "Без указания причины"
@@ -343,7 +347,7 @@ async def can_bot_restrict(chat: types.Chat) -> bool:
 
 
 async def format_user_display(user: types.User) -> str:
-    """Форматирует отображение пользователя (username или ID в копируемом формате)"""
+    """Форматирует отображение пользователя"""
     if user.username:
         return f"@{user.username}"
     else:
@@ -352,21 +356,19 @@ async def format_user_display(user: types.User) -> str:
 
 async def send_action_notification(chat_id: int, action: str, target_user: types.User,
                                    duration: str = "", reason: str = "", admin_user: types.User = None):
-    """Отправляет уведомление о действии в чат с красивым форматированием"""
+    """Отправляет уведомление о действии в чат"""
     try:
-        # Форматируем отображение пользователей
         admin_display = await format_user_display(admin_user) if admin_user else "Система"
         target_display = await format_user_display(target_user)
 
-        # Формируем текст уведомления
         if action == "ban":
             notification = f"💬 Пользователь {admin_display} выдал блокировку пользователю - {target_display}"
         elif action == "unban":
             notification = f"💬 Пользователь {admin_display} снял блокировку пользователю - {target_display}"
         elif action == "mute":
-            notification = f"💬 Пользователь {admin_display} выдал блокировку чата пользователю - {target_display}"
+            notification = f"💬 Пользователь {admin_display} выдал мут пользователю - {target_display}"
         elif action == "unmute":
-            notification = f"💬 Пользователь {admin_display} снял блокировку чата пользователю - {target_display}"
+            notification = f"💬 Пользователь {admin_display} снял мут пользователю - {target_display}"
         elif action == "warn":
             notification = f"💬 Пользователь {admin_display} выдал предупреждение пользователю - {target_display}"
         elif action == "unwarn":
@@ -374,24 +376,20 @@ async def send_action_notification(chat_id: int, action: str, target_user: types
         else:
             notification = f"💬 Пользователь {admin_display} выполнил действие над пользователем - {target_display}"
 
-        # Добавляем время для мута или временного бана
         if duration:
             notification += f" на {duration}"
 
-        # Добавляем причину
         if reason and reason != "Без указания причины":
             notification += f" по причине: {reason}"
         else:
             notification += " без указания причины"
 
-        # Добавляем сообщение владельца, если оно есть
         owner_msg_data = get_owner_message()
         if owner_msg_data:
             owner_message_text, _ = owner_msg_data
             if owner_message_text:
                 notification += f"\n\n{owner_message_text}"
 
-        # Отправляем в чат с HTML разметкой для копирования ID
         await bot.send_message(
             chat_id=chat_id,
             text=notification,
@@ -403,9 +401,9 @@ async def send_action_notification(chat_id: int, action: str, target_user: types
         logger.error(f"Ошибка при отправке уведомления: {e}")
 
 
-# Функция для создания меню
+# Функция для создания меню (ТОЛЬКО ДЛЯ ЛИЧКИ)
 def get_main_menu() -> ReplyKeyboardMarkup:
-    """Создает главное меню"""
+    """Создает главное меню (только для личных сообщений)"""
     keyboard = ReplyKeyboardMarkup(
         keyboard=[
             [KeyboardButton(text="Мой ID")],
@@ -435,33 +433,40 @@ def get_support_menu() -> ReplyKeyboardMarkup:
 # Обработчики команд
 @dp.message(Command("start"))
 async def start_command(message: types.Message):
-    """Команда /start"""
+    """Команда /start - работает везде, но меню только в личке"""
     try:
-        text = "Добро пожаловать! Бот для модерации чата @bu_chilli\n"
-        text += "\nИспользуйте меню для навигации"
+        text = "Добро пожаловать! Бот для модерации чата\n"
+        text += "\nВ личных сообщениях доступно меню"
+        text += "\nВ группе доступны команды модерации"
 
-        # Добавляем сообщение владельца, если оно есть
         owner_msg_data = get_owner_message()
         if owner_msg_data:
             owner_message_text, _ = owner_msg_data
             if owner_message_text:
                 text += f"\n\n{owner_message_text}"
 
-        await message.answer(text, reply_markup=get_main_menu())
+        # Меню показываем ТОЛЬКО в личке
+        if message.chat.type == ChatType.PRIVATE:
+            await message.answer(text, reply_markup=get_main_menu())
+        else:
+            await message.answer(text, reply_markup=None)
+
     except Exception as e:
         logger.error(f"Ошибка в команде start: {e}")
 
 
 @dp.message(F.text == "Мой ID")
 async def my_id_handler(message: types.Message):
-    """Обработчик кнопки Мой ID"""
+    """Обработчик кнопки Мой ID - ТОЛЬКО В ЛИЧКЕ"""
+    if message.chat.type != ChatType.PRIVATE:
+        return  # Игнорируем в группах
+    
     try:
         user = message.from_user
         text = f"ID пользователя: <code>{user.id}</code>\n"
         text += f"Username: @{user.username if user.username else 'отсутствует'}\n"
         text += f"Имя: {user.first_name or ''} {user.last_name or ''}".strip()
 
-        # Добавляем сообщение владельца, если оно есть
         owner_msg_data = get_owner_message()
         if owner_msg_data:
             owner_message_text, _ = owner_msg_data
@@ -475,7 +480,10 @@ async def my_id_handler(message: types.Message):
 
 @dp.message(F.text == "Поддержка")
 async def support_handler(message: types.Message):
-    """Обработчик кнопки Поддержка"""
+    """Обработчик кнопки Поддержка - ТОЛЬКО В ЛИЧКЕ"""
+    if message.chat.type != ChatType.PRIVATE:
+        return  # Игнорируем в группах
+    
     try:
         text = "Поддержка\n\n"
         text += "Выберите тип обращения:\n"
@@ -491,7 +499,10 @@ async def support_handler(message: types.Message):
 
 @dp.message(F.text == "Обжаловать наказание")
 async def appeal_handler(message: types.Message, state: FSMContext):
-    """Обработчик обжалования наказания"""
+    """Обработчик обжалования наказания - ТОЛЬКО В ЛИЧКЕ"""
+    if message.chat.type != ChatType.PRIVATE:
+        return
+    
     try:
         await state.update_data(ticket_type="Обжалование")
         text = "Обжалование наказания\n\n"
@@ -510,7 +521,10 @@ async def appeal_handler(message: types.Message, state: FSMContext):
 
 @dp.message(F.text == "Жалоба")
 async def complaint_handler(message: types.Message, state: FSMContext):
-    """Обработчик жалобы"""
+    """Обработчик жалобы - ТОЛЬКО В ЛИЧКЕ"""
+    if message.chat.type != ChatType.PRIVATE:
+        return
+    
     try:
         await state.update_data(ticket_type="Жалоба")
         text = "Жалоба\n\n"
@@ -530,7 +544,10 @@ async def complaint_handler(message: types.Message, state: FSMContext):
 
 @dp.message(F.text == "Предложение по улучшению")
 async def suggestion_handler(message: types.Message, state: FSMContext):
-    """Обработчик предложения по улучшению"""
+    """Обработчик предложения по улучшению - ТОЛЬКО В ЛИЧКЕ"""
+    if message.chat.type != ChatType.PRIVATE:
+        return
+    
     try:
         await state.update_data(ticket_type="Предложение")
         text = "Предложение по улучшению\n\n"
@@ -549,7 +566,10 @@ async def suggestion_handler(message: types.Message, state: FSMContext):
 
 @dp.message(F.text == "Назад")
 async def back_handler(message: types.Message):
-    """Обработчик кнопки Назад"""
+    """Обработчик кнопки Назад - ТОЛЬКО В ЛИЧКЕ"""
+    if message.chat.type != ChatType.PRIVATE:
+        return
+    
     try:
         await message.answer("Возвращаемся в главное меню", reply_markup=get_main_menu())
     except Exception as e:
@@ -561,17 +581,17 @@ async def back_handler(message: types.Message):
 @dp.message(SupportStates.waiting_for_complaint, F.photo)
 @dp.message(SupportStates.waiting_for_suggestion, F.photo)
 async def handle_support_photo(message: types.Message, state: FSMContext):
-    """Обработка фото в обращениях"""
+    """Обработка фото в обращениях - ТОЛЬКО В ЛИЧКЕ"""
+    if message.chat.type != ChatType.PRIVATE:
+        return
+    
     try:
-        # Сохраняем file_id фото
         photo_file_id = message.photo[-1].file_id
 
         if message.caption:
-            # Есть подпись к фото - сразу обрабатываем
             await state.update_data(photo_file_id=photo_file_id)
             await process_support_request(message, state, caption=message.caption)
         else:
-            # Нет подписи - запрашиваем текст
             await state.update_data(photo_file_id=photo_file_id)
             await message.answer("Фото получено. Теперь отправьте текст обращения.")
             await state.set_state(SupportStates.waiting_for_text_with_photo)
@@ -585,20 +605,14 @@ async def handle_support_photo(message: types.Message, state: FSMContext):
 
 @dp.message(SupportStates.waiting_for_text_with_photo)
 async def handle_text_with_photo(message: types.Message, state: FSMContext):
-    """Обработка текста для фото"""
+    """Обработка текста для фото - ТОЛЬКО В ЛИЧКЕ"""
+    if message.chat.type != ChatType.PRIVATE:
+        return
+    
     try:
         data = await state.get_data()
         ticket_type = data.get('ticket_type', 'Обращение')
 
-        # Получаем текущее состояние
-        if "Обжалование" in ticket_type:
-            current_state = SupportStates.waiting_for_appeal
-        elif "Жалоба" in ticket_type:
-            current_state = SupportStates.waiting_for_complaint
-        else:
-            current_state = SupportStates.waiting_for_suggestion
-
-        # Обрабатываем с фото
         await process_support_request(message, state, ticket_type, caption=message.text)
 
     except Exception as e:
@@ -611,7 +625,10 @@ async def handle_text_with_photo(message: types.Message, state: FSMContext):
 @dp.message(SupportStates.waiting_for_complaint, F.text)
 @dp.message(SupportStates.waiting_for_suggestion, F.text)
 async def handle_support_text(message: types.Message, state: FSMContext):
-    """Обработка текста в обращениях"""
+    """Обработка текста в обращениях - ТОЛЬКО В ЛИЧКЕ"""
+    if message.chat.type != ChatType.PRIVATE:
+        return
+    
     try:
         data = await state.get_data()
         ticket_type = data.get('ticket_type', 'Обращение')
@@ -633,7 +650,6 @@ async def process_support_request(message: types.Message, state: FSMContext,
         photo_file_id = data.get('photo_file_id')
         user = message.from_user
 
-        # Определяем текст сообщения
         message_text = caption if caption else message.text
 
         if not message_text:
@@ -654,7 +670,6 @@ async def process_support_request(message: types.Message, state: FSMContext,
         )
 
         # Создаем клавиатуру для модераторов
-        from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
         keyboard = InlineKeyboardMarkup(inline_keyboard=[
             [
                 InlineKeyboardButton(text="✅ Рассмотрено", callback_data=f"resolve_{ticket_id}"),
@@ -662,7 +677,7 @@ async def process_support_request(message: types.Message, state: FSMContext,
             ]
         ])
 
-        # Формируем сообщение для модераторов с выделенным текстом
+        # Формируем сообщение для модераторов
         mod_text = f"<b>Новое обращение #{ticket_id}</b>\n"
         mod_text += f"<b>Тип:</b> {ticket_type}\n"
         mod_text += f"<b>Пользователь:</b> {user.first_name or ''} {user.last_name or ''}\n"
@@ -670,13 +685,11 @@ async def process_support_request(message: types.Message, state: FSMContext,
         if user.username:
             mod_text += f"<b>Username:</b> @{user.username}\n"
         mod_text += f"<b>Время:</b> {datetime.now().strftime('%d.%m.%Y %H:%M:%S')}\n"
-
         mod_text += f"\n<b>Сообщение:</b>\n"
         mod_text += f"<i>{message_text}</i>"
 
         try:
             if photo_file_id:
-                # Отправляем фото с текстом
                 await bot.send_photo(
                     chat_id=SUPPORT_CHAT_ID,
                     photo=photo_file_id,
@@ -685,7 +698,6 @@ async def process_support_request(message: types.Message, state: FSMContext,
                     reply_markup=keyboard
                 )
             else:
-                # Отправляем только текст
                 await bot.send_message(
                     chat_id=SUPPORT_CHAT_ID,
                     text=mod_text,
@@ -694,23 +706,6 @@ async def process_support_request(message: types.Message, state: FSMContext,
                 )
         except Exception as e:
             logger.error(f"Ошибка при отправке в чат поддержки: {e}")
-            # Пробуем отправить без форматирования
-            try:
-                if photo_file_id:
-                    await bot.send_photo(
-                        chat_id=SUPPORT_CHAT_ID,
-                        photo=photo_file_id,
-                        caption=f"Обращение #{ticket_id} от пользователя {user.id}",
-                        reply_markup=keyboard
-                    )
-                else:
-                    await bot.send_message(
-                        chat_id=SUPPORT_CHAT_ID,
-                        text=f"Обращение #{ticket_id} от пользователя {user.id}",
-                        reply_markup=keyboard
-                    )
-            except:
-                pass
 
         # Отправляем подтверждение пользователю
         user_text = f"Ваше {ticket_type.lower()} принято.\n"
@@ -735,16 +730,13 @@ async def resolve_ticket(callback: types.CallbackQuery):
         ticket_id = int(callback.data.split("_")[1])
         admin_id = callback.from_user.id
 
-        # Обновляем статус обращения
         update_ticket_status(ticket_id, admin_id, "resolved", "Рассмотрено модератором")
 
-        # Получаем информацию об обращении
         ticket = get_ticket_by_id(ticket_id)
         if ticket:
             user_id = ticket[1]
             ticket_type = ticket[5]
 
-            # Отправляем сообщение пользователю
             user_text = f"Ваше {ticket_type.lower()} #{ticket_id} рассмотрено.\n"
             user_text += "Рассмотрено модератором.\n"
             user_text += "Спасибо за обращение!"
@@ -752,9 +744,8 @@ async def resolve_ticket(callback: types.CallbackQuery):
             try:
                 await bot.send_message(chat_id=user_id, text=user_text)
             except:
-                pass  # Пользователь мог заблокировать бота
+                pass
 
-        # Обновляем сообщение в чате поддержки
         try:
             await callback.message.edit_reply_markup(reply_markup=None)
             await callback.message.edit_caption(
@@ -783,14 +774,12 @@ async def respond_ticket(callback: types.CallbackQuery, state: FSMContext):
     try:
         ticket_id = int(callback.data.split("_")[1])
 
-        # Сохраняем ID обращения в состоянии
         await state.update_data(
             ticket_id=ticket_id,
             message_id=callback.message.message_id,
             is_photo=hasattr(callback.message, 'photo') and callback.message.photo
         )
 
-        # Запрашиваем ответ
         await callback.message.answer(
             f"Ответ на обращение #{ticket_id}\n\n"
             "Напишите ваш ответ пользователю. Он получит его как сообщение от бота.\n"
@@ -818,8 +807,6 @@ async def process_response(message: types.Message, state: FSMContext):
             await state.clear()
             return
 
-        from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
-        # Создаем клавиатуру подтверждения
         keyboard = InlineKeyboardMarkup(inline_keyboard=[
             [
                 InlineKeyboardButton(text="✅ Отправить", callback_data=f"send_{ticket_id}_{message_id}"),
@@ -827,7 +814,6 @@ async def process_response(message: types.Message, state: FSMContext):
             ]
         ])
 
-        # Показываем предпросмотр ответа
         preview_text = f"Предпросмотр ответа для обращения #{ticket_id}\n\n"
         preview_text += f"Ваш ответ:\n{message.text}\n\n"
         preview_text += "Подтвердите отправку:"
@@ -849,9 +835,7 @@ async def send_response(callback: types.CallbackQuery, state: FSMContext):
         message_id = int(parts[2])
         admin_id = callback.from_user.id
 
-        # Получаем ответ из сообщения
         response_message = callback.message.text
-        # Извлекаем только текст ответа (убираем предпросмотр)
         lines = response_message.split("\n")
         response_text = ""
         in_response = False
@@ -865,7 +849,6 @@ async def send_response(callback: types.CallbackQuery, state: FSMContext):
 
         response_text = response_text.strip()
 
-        # Получаем информацию об обращении
         ticket = get_ticket_by_id(ticket_id)
         if not ticket:
             await callback.answer("Обращение не найдено")
@@ -874,10 +857,8 @@ async def send_response(callback: types.CallbackQuery, state: FSMContext):
         user_id = ticket[1]
         ticket_type = ticket[5]
 
-        # Обновляем статус обращения
         update_ticket_status(ticket_id, admin_id, "responded", response_text)
 
-        # Отправляем ответ пользователю
         user_text = f"Ответ на ваше {ticket_type.lower()} #{ticket_id}\n\n"
         user_text += f"Сообщение от модератора:\n{response_text}\n\n"
         user_text += "Спасибо за обращение!"
@@ -889,9 +870,7 @@ async def send_response(callback: types.CallbackQuery, state: FSMContext):
             await callback.answer("Не удалось отправить ответ пользователю")
             return
 
-        # Обновляем сообщение в чате поддержки
         try:
-            # Пытаемся обновить подпись к фото
             await bot.edit_message_caption(
                 chat_id=SUPPORT_CHAT_ID,
                 message_id=message_id,
@@ -900,7 +879,6 @@ async def send_response(callback: types.CallbackQuery, state: FSMContext):
             )
         except:
             try:
-                # Пытаемся обновить текст сообщения
                 await bot.edit_message_text(
                     chat_id=SUPPORT_CHAT_ID,
                     message_id=message_id,
@@ -910,7 +888,6 @@ async def send_response(callback: types.CallbackQuery, state: FSMContext):
             except:
                 pass
 
-        # Уведомляем модератора
         await callback.message.edit_text("Ответ на обращение отправлен пользователю", reply_markup=None)
 
         await callback.answer("Ответ отправлен")
@@ -941,22 +918,18 @@ async def add_command(message: types.Message, command: CommandObject):
     try:
         user = message.from_user
 
-        # Проверяем, что команда вызвана владельцем бота
         if user.id != BOT_OWNER_ID:
             await message.reply("Эта команда доступна только владельцу бота")
             return
 
-        # Получаем текст сообщения
         text = command.args or ""
 
         if not text:
             await message.reply("Укажите текст сообщения после команды /add")
             return
 
-        # Сохраняем сообщение владельца в БД
         set_owner_message(user.id, text)
 
-        # Отправляем подтверждение
         response = f"Сообщение владельца установлено\n\n{text}"
 
         await message.reply(response)
@@ -966,17 +939,15 @@ async def add_command(message: types.Message, command: CommandObject):
 
 
 @dp.message(Command("unadd"))
-async def unadd_command(message: types.Message, command: CommandObject):
+async def unadd_command(message: types.Message):
     """Команда /unadd для удаления сообщения владельца"""
     try:
         user = message.from_user
 
-        # Проверяем, что команда вызвана владельцем бота
         if user.id != BOT_OWNER_ID:
             await message.reply("Эта команда доступна только владельцу бота")
             return
 
-        # Удаляем сообщение владельца из БД
         remove_owner_message()
 
         response = "Сообщение владельца удалено"
@@ -987,17 +958,23 @@ async def unadd_command(message: types.Message, command: CommandObject):
         logger.error(f"Ошибка в команде unadd: {e}")
 
 
-# Основные команды модерации
+# Основные команды модерации (РАБОТАЮТ ТОЛЬКО В РАЗРЕШЕННОМ ЧАТЕ)
 @dp.message(Command("ban"))
 async def ban_command(message: types.Message, command: CommandObject):
     """Команда /ban для бана пользователей"""
     try:
         chat = message.chat
-        user = message.from_user
+        
+        # Проверяем разрешенный чат
+        if not await is_allowed_chat(chat.id):
+            await message.reply("❌ Этот бот работает только в одном конкретном чате!")
+            return
 
-        # Проверяем, что команда вызвана в группе
+        # Проверяем что это группа
         if chat.type not in [ChatType.GROUP, ChatType.SUPERGROUP]:
             return
+
+        user = message.from_user
 
         # Проверяем права отправителя
         if not await is_user_admin(chat, user.id):
@@ -1006,7 +983,7 @@ async def ban_command(message: types.Message, command: CommandObject):
 
         # Проверяем права бота
         if not await can_bot_restrict(chat):
-            logger.warning(f"Боту не хватает прав для ограничений в чате {chat.id}")
+            await message.reply("❌ У бота нет прав для ограничения пользователей!")
             return
 
         # Удаляем команду
@@ -1015,114 +992,436 @@ async def ban_command(message: types.Message, command: CommandObject):
         except:
             pass
 
-        # Парсим аргументы
-        args = command.args or ""
-
-        # Определяем параметры
-        target_user = None
-        ban_days = None
-        reason = "Без указания причины"
-
-        # Если команда вызвана как ответ на сообщение
-        if message.reply_to_message and message.reply_to_message.from_user:
-            target_user = message.reply_to_message.from_user
-
-            if args:
-                parts = args.split(maxsplit=1)
-                if parts[0].isdigit():
-                    ban_days = int(parts[0])
-                    if len(parts) > 1:
-                        reason = parts[1]
-                else:
-                    reason = args
-        else:
-            # Команда не ответом
-            if args:
-                parts = args.split(maxsplit=2)
-
-                if len(parts) >= 1:
-                    identifier = parts[0]
-
-                    # Получаем пользователя
-                    if identifier.startswith('@'):
-                        username = identifier[1:]
-                        try:
-                            chat_member = await chat.get_member(username)
-                            target_user = chat_member.user
-                        except:
-                            return
-                    elif identifier.isdigit():
-                        if len(parts) >= 2 and parts[1].isdigit():
-                            user_id = int(identifier)
-                            try:
-                                chat_member = await chat.get_member(user_id)
-                                target_user = chat_member.user
-                                ban_days = int(parts[1])
-                                if len(parts) > 2:
-                                    reason = parts[2]
-                            except:
-                                return
-                        else:
-                            return
-
-                if target_user and len(parts) >= 2 and parts[1].isdigit():
-                    ban_days = int(parts[1])
-                    if len(parts) > 2:
-                        reason = parts[2]
-                elif target_user and len(parts) >= 2:
-                    reason = parts[1]
+        # Получаем цель и причину
+        target_user, reason = await get_target_user(message, command.args or "")
 
         if not target_user:
+            await message.answer("❌ Укажите пользователя (ответом на сообщение или @username)")
             return
 
         # Проверки
         if target_user.id == user.id:
             return
         if target_user.is_bot:
+            await message.answer("❌ Нельзя забанить другого бота!")
             return
         if await is_user_admin(chat, target_user.id):
+            await message.answer("❌ Нельзя забанить администратора!")
             return
 
         # Выполняем бан
         try:
-            if ban_days:
-                until_date = datetime.now() + timedelta(days=ban_days)
-                duration_text = f"{ban_days} дней"
-            else:
-                until_date = datetime.now() + timedelta(days=36500)
-                duration_text = "навсегда"
-
             await bot.ban_chat_member(
                 chat_id=chat.id,
                 user_id=target_user.id,
-                until_date=until_date
+                until_date=datetime.now() + timedelta(days=36500)
             )
 
-            logger.info(f"Пользователь {target_user.id} заблокирован в чате {chat.id} на {duration_text}")
-
-            # Очищаем предупреждения
+            logger.info(f"Пользователь {target_user.id} заблокирован в чате {chat.id}")
             clear_warns_from_db(chat.id, target_user.id)
 
-            # Отправляем уведомление в чат
             await send_action_notification(
                 chat_id=chat.id,
                 action="ban",
                 target_user=target_user,
-                duration=duration_text if ban_days else "",
                 reason=reason,
                 admin_user=user
             )
 
         except Exception as e:
             logger.error(f"Ошибка при бане: {e}")
+            await message.answer(f"❌ Ошибка: {str(e)}")
 
     except Exception as e:
         logger.error(f"Ошибка в команде ban: {e}")
 
 
+@dp.message(Command("mute"))
+async def mute_command(message: types.Message, command: CommandObject):
+    """Команда /mute для мута пользователей"""
+    try:
+        chat = message.chat
+        
+        # Проверяем разрешенный чат
+        if not await is_allowed_chat(chat.id):
+            return
+
+        if chat.type not in [ChatType.GROUP, ChatType.SUPERGROUP]:
+            return
+
+        user = message.from_user
+
+        if not await is_user_admin(chat, user.id):
+            await message.delete()
+            return
+
+        if not await can_bot_restrict(chat):
+            await message.reply("❌ У бота нет прав для ограничения пользователей!")
+            return
+
+        try:
+            await message.delete()
+        except:
+            pass
+
+        args = command.args or ""
+        target_user = None
+        mute_time = "30m"  # по умолчанию 30 минут
+        reason = "Без указания причины"
+
+        # Если ответ на сообщение
+        if message.reply_to_message and message.reply_to_message.from_user:
+            target_user = message.reply_to_message.from_user
+            if args:
+                # Парсим время и причину
+                parts = args.split(maxsplit=1)
+                if parts[0].isdigit():
+                    mute_time = parts[0] + "m"
+                    if len(parts) > 1:
+                        reason = parts[1]
+                else:
+                    reason = args
+        else:
+            # Ищем пользователя в аргументах
+            if args:
+                parts = args.split(maxsplit=2)
+                if len(parts) >= 1:
+                    identifier = parts[0]
+                    if identifier.startswith('@'):
+                        try:
+                            chat_member = await chat.get_member(identifier[1:])
+                            target_user = chat_member.user
+                        except:
+                            pass
+                    elif identifier.isdigit():
+                        try:
+                            chat_member = await chat.get_member(int(identifier))
+                            target_user = chat_member.user
+                        except:
+                            pass
+                    
+                    if target_user and len(parts) >= 2:
+                        if parts[1].isdigit():
+                            mute_time = parts[1] + "m"
+                            if len(parts) > 2:
+                                reason = parts[2]
+                        else:
+                            reason = parts[1]
+
+        if not target_user:
+            await message.answer("❌ Укажите пользователя (ответом на сообщение или @username)")
+            return
+
+        if target_user.id == user.id:
+            return
+        if target_user.is_bot:
+            await message.answer("❌ Нельзя замутить другого бота!")
+            return
+        if await is_user_admin(chat, target_user.id):
+            await message.answer("❌ Нельзя замутить администратора!")
+            return
+
+        # Парсим время мута
+        try:
+            if mute_time.endswith('m'):
+                minutes = int(mute_time[:-1])
+                until_date = datetime.now() + timedelta(minutes=minutes)
+                duration_text = f"{minutes} минут"
+            elif mute_time.endswith('h'):
+                hours = int(mute_time[:-1])
+                until_date = datetime.now() + timedelta(hours=hours)
+                duration_text = f"{hours} часов"
+            elif mute_time.endswith('d'):
+                days = int(mute_time[:-1])
+                until_date = datetime.now() + timedelta(days=days)
+                duration_text = f"{days} дней"
+            else:
+                minutes = int(mute_time) if mute_time.isdigit() else 30
+                until_date = datetime.now() + timedelta(minutes=minutes)
+                duration_text = f"{minutes} минут"
+        except:
+            until_date = datetime.now() + timedelta(minutes=30)
+            duration_text = "30 минут"
+
+        try:
+            await bot.restrict_chat_member(
+                chat_id=chat.id,
+                user_id=target_user.id,
+                permissions=ChatPermissions(can_send_messages=False),
+                until_date=until_date
+            )
+
+            logger.info(f"Пользователь {target_user.id} замучен в чате {chat.id} на {duration_text}")
+
+            await send_action_notification(
+                chat_id=chat.id,
+                action="mute",
+                target_user=target_user,
+                duration=duration_text,
+                reason=reason,
+                admin_user=user
+            )
+
+        except Exception as e:
+            logger.error(f"Ошибка при муте: {e}")
+            await message.answer(f"❌ Ошибка: {str(e)}")
+
+    except Exception as e:
+        logger.error(f"Ошибка в команде mute: {e}")
+
+
+@dp.message(Command("unmute"))
+async def unmute_command(message: types.Message, command: CommandObject):
+    """Команда /unmute для размута пользователей"""
+    try:
+        chat = message.chat
+        
+        # Проверяем разрешенный чат
+        if not await is_allowed_chat(chat.id):
+            return
+
+        if chat.type not in [ChatType.GROUP, ChatType.SUPERGROUP]:
+            return
+
+        user = message.from_user
+
+        if not await is_user_admin(chat, user.id):
+            await message.delete()
+            return
+
+        if not await can_bot_restrict(chat):
+            await message.reply("❌ У бота нет прав для ограничения пользователей!")
+            return
+
+        try:
+            await message.delete()
+        except:
+            pass
+
+        target_user, reason = await get_target_user(message, command.args or "")
+
+        if not target_user:
+            await message.answer("❌ Укажите пользователя (ответом на сообщение или @username)")
+            return
+
+        try:
+            await bot.restrict_chat_member(
+                chat_id=chat.id,
+                user_id=target_user.id,
+                permissions=ChatPermissions(
+                    can_send_messages=True,
+                    can_send_media_messages=True,
+                    can_send_polls=True,
+                    can_send_other_messages=True,
+                    can_add_web_page_previews=True,
+                    can_change_info=False,
+                    can_invite_users=False,
+                    can_pin_messages=False
+                )
+            )
+
+            logger.info(f"Пользователь {target_user.id} размучен в чате {chat.id}")
+
+            await send_action_notification(
+                chat_id=chat.id,
+                action="unmute",
+                target_user=target_user,
+                reason=reason,
+                admin_user=user
+            )
+
+        except Exception as e:
+            logger.error(f"Ошибка при размуте: {e}")
+            await message.answer(f"❌ Ошибка: {str(e)}")
+
+    except Exception as e:
+        logger.error(f"Ошибка в команде unmute: {e}")
+
+
+@dp.message(Command("warn"))
+async def warn_command(message: types.Message, command: CommandObject):
+    """Команда /warn для выдачи предупреждения"""
+    try:
+        chat = message.chat
+        
+        # Проверяем разрешенный чат
+        if not await is_allowed_chat(chat.id):
+            return
+
+        if chat.type not in [ChatType.GROUP, ChatType.SUPERGROUP]:
+            return
+
+        user = message.from_user
+
+        if not await is_user_admin(chat, user.id):
+            await message.delete()
+            return
+
+        try:
+            await message.delete()
+        except:
+            pass
+
+        target_user, reason = await get_target_user(message, command.args or "")
+
+        if not target_user:
+            await message.answer("❌ Укажите пользователя (ответом на сообщение или @username)")
+            return
+
+        if target_user.id == user.id:
+            return
+        if target_user.is_bot:
+            await message.answer("❌ Нельзя выдать предупреждение боту!")
+            return
+        if await is_user_admin(chat, target_user.id):
+            await message.answer("❌ Нельзя выдать предупреждение администратору!")
+            return
+
+        # Добавляем предупреждение в БД
+        add_warn_to_db(chat.id, target_user.id, reason)
+        
+        # Получаем все предупреждения пользователя
+        warns = get_user_warns_from_db(chat.id, target_user.id)
+        warn_count = len(warns)
+
+        # Отправляем уведомление
+        await send_action_notification(
+            chat_id=chat.id,
+            action="warn",
+            target_user=target_user,
+            reason=reason,
+            admin_user=user
+        )
+
+        # Сообщаем о количестве предупреждений
+        warn_info = f"\n\n⚠️ У пользователя {warn_count}/3 предупреждений"
+        if warn_count >= 3:
+            warn_info += "\n🚨 Достигнут лимит предупреждений! Рекомендуется забанить."
+        
+        await message.answer(f"✅ Предупреждение выдано.{warn_info}")
+
+    except Exception as e:
+        logger.error(f"Ошибка в команде warn: {e}")
+        await message.answer(f"❌ Ошибка: {str(e)}")
+
+
+@dp.message(Command("unwarn"))
+async def unwarn_command(message: types.Message, command: CommandObject):
+    """Команда /unwarn для снятия предупреждения"""
+    try:
+        chat = message.chat
+        
+        # Проверяем разрешенный чат
+        if not await is_allowed_chat(chat.id):
+            return
+
+        if chat.type not in [ChatType.GROUP, ChatType.SUPERGROUP]:
+            return
+
+        user = message.from_user
+
+        if not await is_user_admin(chat, user.id):
+            await message.delete()
+            return
+
+        try:
+            await message.delete()
+        except:
+            pass
+
+        target_user, reason = await get_target_user(message, command.args or "")
+
+        if not target_user:
+            await message.answer("❌ Укажите пользователя (ответом на сообщение или @username)")
+            return
+
+        # Проверяем есть ли предупреждения
+        warns = get_user_warns_from_db(chat.id, target_user.id)
+        if not warns:
+            await message.answer("❌ У пользователя нет предупреждений!")
+            return
+
+        # Удаляем последнее предупреждение
+        remove_last_warn_from_db(chat.id, target_user.id)
+        
+        # Получаем оставшиеся предупреждения
+        remaining_warns = get_user_warns_from_db(chat.id, target_user.id)
+        remaining_count = len(remaining_warns)
+
+        # Отправляем уведомление
+        await send_action_notification(
+            chat_id=chat.id,
+            action="unwarn",
+            target_user=target_user,
+            reason=reason,
+            admin_user=user
+        )
+
+        await message.answer(f"✅ Предупреждение снято. Осталось: {remaining_count}/3")
+
+    except Exception as e:
+        logger.error(f"Ошибка в команде unwarn: {e}")
+        await message.answer(f"❌ Ошибка: {str(e)}")
+
+
+@dp.message(Command("warns"))
+async def warns_command(message: types.Message, command: CommandObject):
+    """Команда /warns для просмотра предупреждений"""
+    try:
+        chat = message.chat
+        
+        # Проверяем разрешенный чат
+        if not await is_allowed_chat(chat.id):
+            return
+
+        if chat.type not in [ChatType.GROUP, ChatType.SUPERGROUP]:
+            return
+
+        user = message.from_user
+
+        if not await is_user_admin(chat, user.id):
+            await message.delete()
+            return
+
+        target_user, _ = await get_target_user(message, command.args or "")
+
+        if not target_user:
+            await message.answer("❌ Укажите пользователя (ответом на сообщение или @username)")
+            return
+
+        # Получаем предупреждения
+        warns = get_user_warns_from_db(chat.id, target_user.id)
+        warn_count = len(warns)
+
+        if warn_count == 0:
+            await message.answer(f"✅ У пользователя {await format_user_display(target_user)} нет предупреждений.")
+            return
+
+        # Формируем список предупреждений
+        warns_text = f"📋 Предупреждения пользователя {await format_user_display(target_user)}:\n"
+        warns_text += f"Всего: {warn_count}/3\n\n"
+        
+        for i, warn in enumerate(warns, 1):
+            warns_text += f"{i}. {warn}\n"
+
+        if warn_count >= 3:
+            warns_text += "\n⚠️ Достигнут лимит предупреждений! Рекомендуется забанить."
+
+        await message.answer(warns_text, parse_mode="HTML")
+
+    except Exception as e:
+        logger.error(f"Ошибка в команде warns: {e}")
+        await message.answer(f"❌ Ошибка: {str(e)}")
+
+
+# Обработчик сообщений в группах
 @dp.message(F.chat.type.in_([ChatType.GROUP, ChatType.SUPERGROUP]))
 async def handle_group_messages(message: types.Message):
     """Обработчик сообщений в группах"""
+    # Проверяем разрешенный чат
+    if not await is_allowed_chat(message.chat.id):
+        return
+    
     await silent_delete_service_messages(message)
 
 
@@ -1160,9 +1459,20 @@ async def main():
     # Запускаем HTTP сервер (требуется для Render)
     http_server = await start_http_server()
     
-    logger.info("Бот запущен")
+    logger.info("=" * 50)
+    logger.info("Бот запущен и настроен!")
     logger.info(f"Владелец бота: {BOT_OWNER_ID}")
+    logger.info(f"Разрешенный чат: {ALLOWED_CHAT_ID}")
     logger.info(f"Чат поддержки: {SUPPORT_CHAT_ID}")
+    logger.info("=" * 50)
+    logger.info("Доступные команды в группе:")
+    logger.info("/ban - забанить пользователя")
+    logger.info("/mute - замутить пользователя")
+    logger.info("/unmute - размутить пользователя")
+    logger.info("/warn - выдать предупреждение")
+    logger.info("/unwarn - снять предупреждение")
+    logger.info("/warns - посмотреть предупреждения")
+    logger.info("=" * 50)
     logger.info(f"HTTP сервер слушает порт: {PORT}")
 
     # Запускаем поллинг
@@ -1174,5 +1484,4 @@ async def main():
 
 
 if __name__ == "__main__":
-
     asyncio.run(main())
