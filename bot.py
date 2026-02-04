@@ -36,11 +36,17 @@ try:
 except:
     BOT_OWNER_ID = 6493670021  # твой ID по умолчанию
 
-# ID чата для обращений
+# ID чата для обращений (исправлено - удалены лишние скобки)
 try:
     SUPPORT_CHAT_ID = int(os.getenv("SUPPORT_CHAT_ID", "-1003559804187"))
 except:
-    SUPPORT_CHAT_ID = -1003559804187))
+    SUPPORT_CHAT_ID = -1003559804187
+
+# ID чата, где должен работать бот (добавьте это в переменные окружения)
+try:
+    ALLOWED_CHAT_ID = int(os.getenv("ALLOWED_CHAT_ID", "-1003559804187"))
+except:
+    ALLOWED_CHAT_ID = -1002287799491
 
 # Порт для Render
 PORT = int(os.getenv("PORT", 10000))
@@ -49,7 +55,6 @@ PORT = int(os.getenv("PORT", 10000))
 storage = MemoryStorage()
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher(storage=storage)
-
 
 # Состояния FSM
 class SupportStates(StatesGroup):
@@ -60,10 +65,8 @@ class SupportStates(StatesGroup):
     waiting_for_photo = State()
     waiting_for_text_with_photo = State()
 
-
 # Инициализация базы данных
 DB_NAME = "bot_database.db"
-
 
 def init_db():
     """Инициализация базы данных"""
@@ -115,9 +118,7 @@ def init_db():
     conn.commit()
     conn.close()
 
-
 init_db()
-
 
 # Функции для работы с БД
 def add_warn_to_db(chat_id: int, user_id: int, reason: str):
@@ -131,7 +132,6 @@ def add_warn_to_db(chat_id: int, user_id: int, reason: str):
     conn.commit()
     conn.close()
 
-
 def get_user_warns_from_db(chat_id: int, user_id: int) -> List[str]:
     """Получает предупреждения пользователя из базы данных"""
     conn = sqlite3.connect(DB_NAME)
@@ -143,7 +143,6 @@ def get_user_warns_from_db(chat_id: int, user_id: int) -> List[str]:
     results = cursor.fetchall()
     conn.close()
     return [row[0] for row in results]
-
 
 def remove_last_warn_from_db(chat_id: int, user_id: int):
     """Удаляет последнее предупреждение пользователя из базы данных"""
@@ -160,7 +159,6 @@ def remove_last_warn_from_db(chat_id: int, user_id: int):
     conn.commit()
     conn.close()
 
-
 def clear_warns_from_db(chat_id: int, user_id: int):
     """Удаляет все предупреждения пользователя из базы данных"""
     conn = sqlite3.connect(DB_NAME)
@@ -171,7 +169,6 @@ def clear_warns_from_db(chat_id: int, user_id: int):
     )
     conn.commit()
     conn.close()
-
 
 def set_owner_message(owner_id: int, message: str):
     """Устанавливает сообщение владельца"""
@@ -185,7 +182,6 @@ def set_owner_message(owner_id: int, message: str):
     conn.commit()
     conn.close()
 
-
 def get_owner_message() -> Optional[tuple]:
     """Получает сообщение владельца"""
     conn = sqlite3.connect(DB_NAME)
@@ -195,7 +191,6 @@ def get_owner_message() -> Optional[tuple]:
     conn.close()
     return result
 
-
 def remove_owner_message():
     """Удаляет сообщение владельца"""
     conn = sqlite3.connect(DB_NAME)
@@ -203,7 +198,6 @@ def remove_owner_message():
     cursor.execute("DELETE FROM owner_message")
     conn.commit()
     conn.close()
-
 
 def add_support_ticket(user_id: int, username: str, first_name: str, last_name: str,
                        ticket_type: str, message: str, photo_file_id: str = None) -> int:
@@ -218,7 +212,6 @@ def add_support_ticket(user_id: int, username: str, first_name: str, last_name: 
     conn.commit()
     conn.close()
     return ticket_id
-
 
 def update_ticket_status(ticket_id: int, admin_id: int, status: str, response: str = None):
     """Обновляет статус обращения"""
@@ -239,7 +232,6 @@ def update_ticket_status(ticket_id: int, admin_id: int, status: str, response: s
     conn.commit()
     conn.close()
 
-
 def get_ticket_by_id(ticket_id: int) -> Optional[tuple]:
     """Получает обращение по ID"""
     conn = sqlite3.connect(DB_NAME)
@@ -248,7 +240,6 @@ def get_ticket_by_id(ticket_id: int) -> Optional[tuple]:
     result = cursor.fetchone()
     conn.close()
     return result
-
 
 async def silent_delete_service_messages(message: types.Message):
     """Тихо удаляет служебные сообщения о входе/выходе"""
@@ -275,7 +266,6 @@ async def silent_delete_service_messages(message: types.Message):
 
     except Exception as e:
         logger.error(f"Ошибка в обработке сообщения: {e}")
-
 
 async def get_target_user(message: types.Message, command: CommandObject) -> tuple[Optional[types.User], str]:
     """Получает целевого пользователя и причину из команды"""
@@ -322,7 +312,6 @@ async def get_target_user(message: types.Message, command: CommandObject) -> tup
 
     return None, "Без указания причины"
 
-
 async def is_user_admin(chat: types.Chat, user_id: int) -> bool:
     """Проверяет, является ли пользователь администратором"""
     try:
@@ -330,7 +319,6 @@ async def is_user_admin(chat: types.Chat, user_id: int) -> bool:
         return member.status in [ChatMemberStatus.ADMINISTRATOR, ChatMemberStatus.CREATOR]
     except:
         return False
-
 
 async def can_bot_restrict(chat: types.Chat) -> bool:
     """Проверяет, может ли бот ограничивать пользователей"""
@@ -340,14 +328,12 @@ async def can_bot_restrict(chat: types.Chat) -> bool:
     except:
         return False
 
-
 async def format_user_display(user: types.User) -> str:
     """Форматирует отображение пользователя (username или ID в копируемом формате)"""
     if user.username:
         return f"@{user.username}"
     else:
         return f"<code>{user.id}</code>"
-
 
 async def send_action_notification(chat_id: int, action: str, target_user: types.User,
                                    duration: str = "", reason: str = "", admin_user: types.User = None):
@@ -401,7 +387,6 @@ async def send_action_notification(chat_id: int, action: str, target_user: types
     except Exception as e:
         logger.error(f"Ошибка при отправке уведомления: {e}")
 
-
 # Функция для создания меню
 def get_main_menu() -> ReplyKeyboardMarkup:
     """Создает главное меню"""
@@ -414,7 +399,6 @@ def get_main_menu() -> ReplyKeyboardMarkup:
         one_time_keyboard=False
     )
     return keyboard
-
 
 def get_support_menu() -> ReplyKeyboardMarkup:
     """Создает меню поддержки"""
@@ -430,9 +414,24 @@ def get_support_menu() -> ReplyKeyboardMarkup:
     )
     return keyboard
 
+# Фильтр для проверки, что бот работает только в разрешенном чате
+def allowed_chat_only():
+    """Фильтр для проверки разрешенного чата"""
+    async def func(message: types.Message):
+        return message.chat.id == ALLOWED_CHAT_ID
+    
+    return func
 
-# Обработчики команд
-@dp.message(Command("start"))
+# Фильтр для проверки, что команда используется в ЛС
+def private_chat_only():
+    """Фильтр для проверки, что команда в ЛС"""
+    async def func(message: types.Message):
+        return message.chat.type == ChatType.PRIVATE
+    
+    return func
+
+# Обработчики команд (для ЛС)
+@dp.message(Command("start"), private_chat_only())
 async def start_command(message: types.Message):
     """Команда /start"""
     try:
@@ -450,8 +449,7 @@ async def start_command(message: types.Message):
     except Exception as e:
         logger.error(f"Ошибка в команде start: {e}")
 
-
-@dp.message(F.text == "Мой ID")
+@dp.message(F.text == "Мой ID", private_chat_only())
 async def my_id_handler(message: types.Message):
     """Обработчик кнопки Мой ID"""
     try:
@@ -471,8 +469,7 @@ async def my_id_handler(message: types.Message):
     except Exception as e:
         logger.error(f"Ошибка в обработчике моего ID: {e}")
 
-
-@dp.message(F.text == "Поддержка")
+@dp.message(F.text == "Поддержка", private_chat_only())
 async def support_handler(message: types.Message):
     """Обработчик кнопки Поддержка"""
     try:
@@ -487,8 +484,7 @@ async def support_handler(message: types.Message):
     except Exception as e:
         logger.error(f"Ошибка в обработчике поддержки: {e}")
 
-
-@dp.message(F.text == "Обжаловать наказание")
+@dp.message(F.text == "Обжаловать наказание", private_chat_only())
 async def appeal_handler(message: types.Message, state: FSMContext):
     """Обработчик обжалования наказания"""
     try:
@@ -506,8 +502,7 @@ async def appeal_handler(message: types.Message, state: FSMContext):
     except Exception as e:
         logger.error(f"Ошибка в обработчике обжалования: {e}")
 
-
-@dp.message(F.text == "Жалоба")
+@dp.message(F.text == "Жалоба", private_chat_only())
 async def complaint_handler(message: types.Message, state: FSMContext):
     """Обработчик жалобы"""
     try:
@@ -526,8 +521,7 @@ async def complaint_handler(message: types.Message, state: FSMContext):
     except Exception as e:
         logger.error(f"Ошибка в обработчике жалобы: {e}")
 
-
-@dp.message(F.text == "Предложение по улучшению")
+@dp.message(F.text == "Предложение по улучшению", private_chat_only())
 async def suggestion_handler(message: types.Message, state: FSMContext):
     """Обработчик предложения по улучшению"""
     try:
@@ -545,8 +539,7 @@ async def suggestion_handler(message: types.Message, state: FSMContext):
     except Exception as e:
         logger.error(f"Ошибка в обработчике предложения: {e}")
 
-
-@dp.message(F.text == "Назад")
+@dp.message(F.text == "Назад", private_chat_only())
 async def back_handler(message: types.Message):
     """Обработчик кнопки Назад"""
     try:
@@ -554,11 +547,10 @@ async def back_handler(message: types.Message):
     except Exception as e:
         logger.error(f"Ошибка в обработчике назад: {e}")
 
-
-# Обработчики для текста и фото в обращениях
-@dp.message(SupportStates.waiting_for_appeal, F.photo)
-@dp.message(SupportStates.waiting_for_complaint, F.photo)
-@dp.message(SupportStates.waiting_for_suggestion, F.photo)
+# Обработчики для текста и фото в обращениях (только в ЛС)
+@dp.message(SupportStates.waiting_for_appeal, F.photo, private_chat_only())
+@dp.message(SupportStates.waiting_for_complaint, F.photo, private_chat_only())
+@dp.message(SupportStates.waiting_for_suggestion, F.photo, private_chat_only())
 async def handle_support_photo(message: types.Message, state: FSMContext):
     """Обработка фото в обращениях"""
     try:
@@ -581,8 +573,7 @@ async def handle_support_photo(message: types.Message, state: FSMContext):
                              reply_markup=get_main_menu())
         await state.clear()
 
-
-@dp.message(SupportStates.waiting_for_text_with_photo)
+@dp.message(SupportStates.waiting_for_text_with_photo, private_chat_only())
 async def handle_text_with_photo(message: types.Message, state: FSMContext):
     """Обработка текста для фото"""
     try:
@@ -605,10 +596,9 @@ async def handle_text_with_photo(message: types.Message, state: FSMContext):
         await message.answer("Ошибка. Попробуйте снова.", reply_markup=get_main_menu())
         await state.clear()
 
-
-@dp.message(SupportStates.waiting_for_appeal, F.text)
-@dp.message(SupportStates.waiting_for_complaint, F.text)
-@dp.message(SupportStates.waiting_for_suggestion, F.text)
+@dp.message(SupportStates.waiting_for_appeal, F.text, private_chat_only())
+@dp.message(SupportStates.waiting_for_complaint, F.text, private_chat_only())
+@dp.message(SupportStates.waiting_for_suggestion, F.text, private_chat_only())
 async def handle_support_text(message: types.Message, state: FSMContext):
     """Обработка текста в обращениях"""
     try:
@@ -619,7 +609,6 @@ async def handle_support_text(message: types.Message, state: FSMContext):
         logger.error(f"Ошибка при обработке текста обращения: {e}")
         await message.answer("Ошибка. Попробуйте снова.", reply_markup=get_main_menu())
         await state.clear()
-
 
 async def process_support_request(message: types.Message, state: FSMContext,
                                   ticket_type: str = None, caption: str = None):
@@ -726,7 +715,6 @@ async def process_support_request(message: types.Message, state: FSMContext,
                              reply_markup=get_main_menu())
         await state.clear()
 
-
 @dp.callback_query(F.data.startswith("resolve_"))
 async def resolve_ticket(callback: types.CallbackQuery):
     """Обработка кнопки Рассмотрено"""
@@ -775,7 +763,6 @@ async def resolve_ticket(callback: types.CallbackQuery):
         logger.error(f"Ошибка при рассмотрении обращения: {e}")
         await callback.answer("Произошла ошибка")
 
-
 @dp.callback_query(F.data.startswith("respond_"))
 async def respond_ticket(callback: types.CallbackQuery, state: FSMContext):
     """Обработка кнопки Ответить"""
@@ -802,7 +789,6 @@ async def respond_ticket(callback: types.CallbackQuery, state: FSMContext):
     except Exception as e:
         logger.error(f"Ошибка при подготовке ответа: {e}")
         await callback.answer("Произошла ошибка")
-
 
 @dp.message(SupportStates.waiting_for_response)
 async def process_response(message: types.Message, state: FSMContext):
@@ -837,7 +823,6 @@ async def process_response(message: types.Message, state: FSMContext):
         logger.error(f"Ошибка при обработке ответа: {e}")
         await message.answer("Произошла ошибка", reply_markup=get_main_menu())
         await state.clear()
-
 
 @dp.callback_query(F.data.startswith("send_"))
 async def send_response(callback: types.CallbackQuery, state: FSMContext):
@@ -920,7 +905,6 @@ async def send_response(callback: types.CallbackQuery, state: FSMContext):
         await callback.answer("Произошла ошибка")
         await state.clear()
 
-
 @dp.callback_query(F.data.startswith("cancel_"))
 async def cancel_response(callback: types.CallbackQuery, state: FSMContext):
     """Отмена отправки ответа"""
@@ -932,8 +916,7 @@ async def cancel_response(callback: types.CallbackQuery, state: FSMContext):
         logger.error(f"Ошибка при отмене ответа: {e}")
         await callback.answer("Произошла ошибка")
 
-
-# Команды владельца бота
+# Команды владельца бота (работают везде)
 @dp.message(Command("add"))
 async def add_command(message: types.Message, command: CommandObject):
     """Команда /add для добавления сообщения владельца"""
@@ -963,7 +946,6 @@ async def add_command(message: types.Message, command: CommandObject):
     except Exception as e:
         logger.error(f"Ошибка в команде add: {e}")
 
-
 @dp.message(Command("unadd"))
 async def unadd_command(message: types.Message, command: CommandObject):
     """Команда /unadd для удаления сообщения владельца"""
@@ -985,18 +967,13 @@ async def unadd_command(message: types.Message, command: CommandObject):
     except Exception as e:
         logger.error(f"Ошибка в команде unadd: {e}")
 
-
-# Основные команды модерации
-@dp.message(Command("ban"))
+# Основные команды модерации (работают только в разрешенном чате)
+@dp.message(Command("ban"), allowed_chat_only())
 async def ban_command(message: types.Message, command: CommandObject):
     """Команда /ban для бана пользователей"""
     try:
         chat = message.chat
         user = message.from_user
-
-        # Проверяем, что команда вызвана в группе
-        if chat.type not in [ChatType.GROUP, ChatType.SUPERGROUP]:
-            return
 
         # Проверяем права отправителя
         if not await is_user_admin(chat, user.id):
@@ -1118,38 +1095,34 @@ async def ban_command(message: types.Message, command: CommandObject):
     except Exception as e:
         logger.error(f"Ошибка в команде ban: {e}")
 
-
-@dp.message(F.chat.type.in_([ChatType.GROUP, ChatType.SUPERGROUP]))
+# Обработка сообщений в группе (только в разрешенном чате)
+@dp.message(allowed_chat_only())
 async def handle_group_messages(message: types.Message):
     """Обработчик сообщений в группах"""
     await silent_delete_service_messages(message)
-
 
 async def error_handler(update: types.Update, exception: Exception):
     """Обработчик ошибок"""
     logger.error(f"Ошибка: {exception}", exc_info=exception)
     return True
 
-
 # HTTP сервер для Render
 async def health_check(request):
     """Проверка здоровья сервера"""
     return web.Response(text="OK")
 
-
 async def start_http_server():
     """Запуск HTTP сервера"""
     app = web.Application()
     app.router.add_get('/health', health_check)
-    
+
     runner = web.AppRunner(app)
     await runner.setup()
     site = web.TCPSite(runner, '0.0.0.0', PORT)
     await site.start()
-    
+
     print(f"HTTP сервер запущен на порту {PORT}")
     return runner
-
 
 async def main():
     """Запуск бота"""
@@ -1158,19 +1131,19 @@ async def main():
 
     # Запускаем HTTP сервер (требуется для Render)
     http_server = await start_http_server()
-    
+
     logger.info("Бот запущен")
     logger.info(f"Владелец бота: {BOT_OWNER_ID}")
     logger.info(f"Чат поддержки: {SUPPORT_CHAT_ID}")
+    logger.info(f"Разрешенный чат для работы: {ALLOWED_CHAT_ID}")
     logger.info(f"HTTP сервер слушает порт: {PORT}")
 
     # Запускаем поллинг
     await bot.delete_webhook(drop_pending_updates=True)
     await dp.start_polling(bot)
-    
+
     # Останавливаем HTTP сервер при завершении
     await http_server.cleanup()
-
 
 if __name__ == "__main__":
     asyncio.run(main())
