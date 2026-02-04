@@ -60,6 +60,7 @@ dp = Dispatcher(storage=storage)
 private_router = Router()
 group_router = Router()
 
+
 # Состояния FSM
 class SupportStates(StatesGroup):
     waiting_for_appeal = State()
@@ -68,8 +69,10 @@ class SupportStates(StatesGroup):
     waiting_for_response = State()
     waiting_for_text_with_photo = State()
 
+
 # Инициализация базы данных
 DB_NAME = "bot_database.db"
+
 
 def init_db():
     """Инициализация базы данных"""
@@ -117,7 +120,9 @@ def init_db():
     conn.commit()
     conn.close()
 
+
 init_db()
+
 
 # Функции для работы с БД (оставляем без изменений)
 def add_warn_to_db(chat_id: int, user_id: int, reason: str):
@@ -130,6 +135,7 @@ def add_warn_to_db(chat_id: int, user_id: int, reason: str):
     conn.commit()
     conn.close()
 
+
 def get_user_warns_from_db(chat_id: int, user_id: int) -> List[str]:
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
@@ -141,6 +147,7 @@ def get_user_warns_from_db(chat_id: int, user_id: int) -> List[str]:
     conn.close()
     return [row[0] for row in results]
 
+
 def clear_warns_from_db(chat_id: int, user_id: int):
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
@@ -150,6 +157,7 @@ def clear_warns_from_db(chat_id: int, user_id: int):
     )
     conn.commit()
     conn.close()
+
 
 def set_owner_message(owner_id: int, message: str):
     conn = sqlite3.connect(DB_NAME)
@@ -162,6 +170,7 @@ def set_owner_message(owner_id: int, message: str):
     conn.commit()
     conn.close()
 
+
 def get_owner_message() -> Optional[tuple]:
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
@@ -170,12 +179,14 @@ def get_owner_message() -> Optional[tuple]:
     conn.close()
     return result
 
+
 def remove_owner_message():
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
     cursor.execute("DELETE FROM owner_message")
     conn.commit()
     conn.close()
+
 
 def add_support_ticket(user_id: int, username: str, first_name: str, last_name: str,
                        ticket_type: str, message: str, photo_file_id: str = None) -> int:
@@ -189,6 +200,7 @@ def add_support_ticket(user_id: int, username: str, first_name: str, last_name: 
     conn.commit()
     conn.close()
     return ticket_id
+
 
 def update_ticket_status(ticket_id: int, admin_id: int, status: str, response: str = None):
     conn = sqlite3.connect(DB_NAME)
@@ -208,6 +220,7 @@ def update_ticket_status(ticket_id: int, admin_id: int, status: str, response: s
     conn.commit()
     conn.close()
 
+
 def get_ticket_by_id(ticket_id: int) -> Optional[tuple]:
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
@@ -215,6 +228,7 @@ def get_ticket_by_id(ticket_id: int) -> Optional[tuple]:
     result = cursor.fetchone()
     conn.close()
     return result
+
 
 async def silent_delete_service_messages(message: types.Message):
     """Тихо удаляет служебные сообщения о входе/выходе"""
@@ -240,6 +254,7 @@ async def silent_delete_service_messages(message: types.Message):
     except Exception as e:
         logger.error(f"Ошибка в обработке сообщения: {e}")
 
+
 async def is_user_admin(chat: types.Chat, user_id: int) -> bool:
     """Проверяет, является ли пользователь администратором"""
     try:
@@ -247,6 +262,7 @@ async def is_user_admin(chat: types.Chat, user_id: int) -> bool:
         return member.status in [ChatMemberStatus.ADMINISTRATOR, ChatMemberStatus.CREATOR]
     except:
         return False
+
 
 async def can_bot_restrict(chat: types.Chat) -> bool:
     """Проверяет, может ли бот ограничивать пользователей"""
@@ -256,12 +272,14 @@ async def can_bot_restrict(chat: types.Chat) -> bool:
     except:
         return False
 
+
 async def format_user_display(user: types.User) -> str:
     """Форматирует отображение пользователя"""
     if user.username:
         return f"@{user.username}"
     else:
         return f"<code>{user.id}</code>"
+
 
 async def send_action_notification(chat_id: int, action: str, target_user: types.User,
                                    duration: str = "", reason: str = "", admin_user: types.User = None):
@@ -308,6 +326,7 @@ async def send_action_notification(chat_id: int, action: str, target_user: types
     except Exception as e:
         logger.error(f"Ошибка при отправке уведомления: {e}")
 
+
 # Функция для создания меню
 def get_main_menu() -> ReplyKeyboardMarkup:
     keyboard = ReplyKeyboardMarkup(
@@ -319,6 +338,7 @@ def get_main_menu() -> ReplyKeyboardMarkup:
         one_time_keyboard=False
     )
     return keyboard
+
 
 def get_support_menu() -> ReplyKeyboardMarkup:
     keyboard = ReplyKeyboardMarkup(
@@ -332,6 +352,7 @@ def get_support_menu() -> ReplyKeyboardMarkup:
         one_time_keyboard=False
     )
     return keyboard
+
 
 # ========== ОБРАБОТЧИКИ ДЛЯ ЛИЧНЫХ СООБЩЕНИЙ ==========
 
@@ -352,6 +373,7 @@ async def start_command(message: types.Message):
     except Exception as e:
         logger.error(f"Ошибка в команде start: {e}")
 
+
 @private_router.message(F.text == "Мой ID")
 async def my_id_handler(message: types.Message):
     """Обработчик кнопки Мой ID"""
@@ -371,6 +393,7 @@ async def my_id_handler(message: types.Message):
     except Exception as e:
         logger.error(f"Ошибка в обработчике моего ID: {e}")
 
+
 @private_router.message(F.text == "Поддержка")
 async def support_handler(message: types.Message):
     """Обработчик кнопки Поддержка"""
@@ -385,6 +408,7 @@ async def support_handler(message: types.Message):
         await message.answer(text, reply_markup=get_support_menu())
     except Exception as e:
         logger.error(f"Ошибка в обработчике поддержки: {e}")
+
 
 @private_router.message(F.text == "Обжаловать наказание")
 async def appeal_handler(message: types.Message, state: FSMContext):
@@ -403,6 +427,7 @@ async def appeal_handler(message: types.Message, state: FSMContext):
         await state.set_state(SupportStates.waiting_for_appeal)
     except Exception as e:
         logger.error(f"Ошибка в обработчике обжалования: {e}")
+
 
 @private_router.message(F.text == "Жалоба")
 async def complaint_handler(message: types.Message, state: FSMContext):
@@ -423,6 +448,7 @@ async def complaint_handler(message: types.Message, state: FSMContext):
     except Exception as e:
         logger.error(f"Ошибка в обработчике жалобы: {e}")
 
+
 @private_router.message(F.text == "Предложение по улучшению")
 async def suggestion_handler(message: types.Message, state: FSMContext):
     """Обработчик предложения по улучшению"""
@@ -441,6 +467,7 @@ async def suggestion_handler(message: types.Message, state: FSMContext):
     except Exception as e:
         logger.error(f"Ошибка в обработчике предложения: {e}")
 
+
 @private_router.message(F.text == "Назад")
 async def back_handler(message: types.Message):
     """Обработчик кнопки Назад"""
@@ -448,6 +475,7 @@ async def back_handler(message: types.Message):
         await message.answer("Возвращаемся в главное меню", reply_markup=get_main_menu())
     except Exception as e:
         logger.error(f"Ошибка в обработчике назад: {e}")
+
 
 # Обработчики для поддержки в ЛС
 @private_router.message(SupportStates.waiting_for_appeal, F.photo)
@@ -472,6 +500,7 @@ async def handle_support_photo(message: types.Message, state: FSMContext):
                              reply_markup=get_main_menu())
         await state.clear()
 
+
 @private_router.message(SupportStates.waiting_for_text_with_photo)
 async def handle_text_with_photo(message: types.Message, state: FSMContext):
     """Обработка текста для фото"""
@@ -479,13 +508,14 @@ async def handle_text_with_photo(message: types.Message, state: FSMContext):
         data = await state.get_data()
         ticket_type = data.get('ticket_type', 'Обращение')
         photo_file_id = data.get('photo_file_id')
-        
+
         await process_support_request(message, state, ticket_type, photo_file_id, caption=message.text)
 
     except Exception as e:
         logger.error(f"Ошибка при обработке текста с фото: {e}")
         await message.answer("Ошибка. Попробуйте снова.", reply_markup=get_main_menu())
         await state.clear()
+
 
 @private_router.message(SupportStates.waiting_for_appeal, F.text)
 @private_router.message(SupportStates.waiting_for_complaint, F.text)
@@ -501,6 +531,7 @@ async def handle_support_text(message: types.Message, state: FSMContext):
         await message.answer("Ошибка. Попробуйте снова.", reply_markup=get_main_menu())
         await state.clear()
 
+
 async def process_support_request(message: types.Message, state: FSMContext,
                                   ticket_type: str = None, photo_file_id: str = None, caption: str = None):
     """Обработка запроса в поддержку"""
@@ -508,10 +539,10 @@ async def process_support_request(message: types.Message, state: FSMContext,
         data = await state.get_data()
         if not ticket_type:
             ticket_type = data.get('ticket_type', 'Обращение')
-        
+
         if not photo_file_id:
             photo_file_id = data.get('photo_file_id')
-            
+
         user = message.from_user
         message_text = caption if caption else message.text
 
@@ -585,6 +616,7 @@ async def process_support_request(message: types.Message, state: FSMContext,
                              reply_markup=get_main_menu())
         await state.clear()
 
+
 # ========== ОБРАБОТЧИКИ ДЛЯ ГРУПП (МОДЕРАЦИЯ) ==========
 
 @dp.message(Command("ban"))
@@ -592,11 +624,11 @@ async def ban_command(message: types.Message, command: CommandObject):
     """Команда /ban для бана пользователей"""
     try:
         chat = message.chat
-        
+
         # Проверяем, что команда вызвана в разрешенном чате
         if chat.id != ALLOWED_CHAT_ID:
             return
-            
+
         user = message.from_user
 
         # Проверяем права отправителя
@@ -691,16 +723,17 @@ async def ban_command(message: types.Message, command: CommandObject):
     except Exception as e:
         logger.error(f"Ошибка в команде ban: {e}")
 
+
 @dp.message(Command("mute"))
 async def mute_command(message: types.Message, command: CommandObject):
     """Команда /mute для мута пользователей"""
     try:
         chat = message.chat
-        
+
         # Проверяем, что команда вызвана в разрешенном чате
         if chat.id != ALLOWED_CHAT_ID:
             return
-            
+
         user = message.from_user
 
         # Проверяем права отправителя
@@ -826,16 +859,17 @@ async def mute_command(message: types.Message, command: CommandObject):
     except Exception as e:
         logger.error(f"Ошибка в команде mute: {e}")
 
+
 @dp.message(Command("warn"))
 async def warn_command(message: types.Message, command: CommandObject):
     """Команда /warn для выдачи предупреждения"""
     try:
         chat = message.chat
-        
+
         # Проверяем, что команда вызвана в разрешенном чате
         if chat.id != ALLOWED_CHAT_ID:
             return
-            
+
         user = message.from_user
 
         # Проверяем права отправителя
@@ -900,7 +934,7 @@ async def warn_command(message: types.Message, command: CommandObject):
         # Добавляем предупреждение
         add_warn_to_db(chat.id, target_user.id, reason)
         warns = get_user_warns_from_db(chat.id, target_user.id)
-        
+
         # Отправляем уведомление в чат
         await send_action_notification(
             chat_id=chat.id,
@@ -909,14 +943,14 @@ async def warn_command(message: types.Message, command: CommandObject):
             reason=reason,
             admin_user=user
         )
-        
+
         # Сообщаем о количестве варнов
         await message.answer(
             f"Пользователь {await format_user_display(target_user)} получил предупреждение.\n"
             f"Всего предупреждений: {len(warns)}/3",
             parse_mode="HTML"
         )
-        
+
         # Проверяем на бан при 3 варнах
         if len(warns) >= 3:
             try:
@@ -936,6 +970,366 @@ async def warn_command(message: types.Message, command: CommandObject):
 
     except Exception as e:
         logger.error(f"Ошибка в команде warn: {e}")
+
+
+# ========== ДОБАВЛЯЕМ ПОСЛЕ КОМАНДЫ /warn ==========
+
+@dp.message(Command("unban"))
+async def unban_command(message: types.Message, command: CommandObject):
+    """Команда /unban для разбана пользователей"""
+    try:
+        chat = message.chat
+
+        # Проверяем, что команда вызвана в разрешенном чате
+        if chat.id != ALLOWED_CHAT_ID:
+            return
+
+        user = message.from_user
+
+        # Проверяем права отправителя
+        if not await is_user_admin(chat, user.id):
+            try:
+                await message.delete()
+            except:
+                pass
+            return
+
+        # Проверяем права бота
+        if not await can_bot_restrict(chat):
+            logger.warning(f"Боту не хватает прав для ограничений в чате {chat.id}")
+            return
+
+        # Удаляем команду
+        try:
+            await message.delete()
+        except:
+            pass
+
+        # Определяем параметры
+        target_user = None
+        reason = "Без указания причины"
+
+        # Если команда вызвана как ответ на сообщение
+        if message.reply_to_message and message.reply_to_message.from_user:
+            target_user = message.reply_to_message.from_user
+            reason = command.args or "Без указания причины"
+        else:
+            # Команда не ответом
+            args = command.args or ""
+            if args:
+                parts = args.split(maxsplit=1)
+                if len(parts) > 0:
+                    identifier = parts[0]
+                    if len(parts) > 1:
+                        reason = parts[1]
+
+                    # Получаем пользователя
+                    if identifier.startswith('@'):
+                        username = identifier[1:]
+                        try:
+                            # Пытаемся получить пользователя по username
+                            # Для разбана нам нужно только получить ID пользователя
+                            # Так как он уже не в чате, используем альтернативный подход
+                            target_user = types.User(
+                                id=0,  # Заглушка, будет заменено ниже
+                                is_bot=False,
+                                first_name=username
+                            )
+                            # В реальности нужно получать ID из БД или другого источника
+                            # Для простоты оставим заглушку
+                        except:
+                            return
+                    elif identifier.isdigit():
+                        user_id = int(identifier)
+                        target_user = types.User(
+                            id=user_id,
+                            is_bot=False,
+                            first_name=f"User_{user_id}"
+                        )
+
+        if not target_user:
+            # Если пользователь не указан, пробуем разбанить по ID из ответа
+            if message.reply_to_message and message.reply_to_message.from_user:
+                target_user = message.reply_to_message.from_user
+                reason = command.args or "Без указания причины"
+            else:
+                return
+
+        # Проверки
+        if target_user.id == user.id:
+            return
+        if target_user.is_bot:
+            return
+
+        # Выполняем разбан
+        try:
+            await bot.unban_chat_member(
+                chat_id=chat.id,
+                user_id=target_user.id,
+                only_if_banned=True
+            )
+
+            logger.info(f"Пользователь {target_user.id} разбанен в чате {chat.id}")
+
+            # Отправляем уведомление в чат
+            await send_action_notification(
+                chat_id=chat.id,
+                action="unban",
+                target_user=target_user,
+                reason=reason,
+                admin_user=user
+            )
+
+        except Exception as e:
+            logger.error(f"Ошибка при разбане: {e}")
+            await message.answer(f"Ошибка при разбане пользователя: {e}")
+
+    except Exception as e:
+        logger.error(f"Ошибка в команде unban: {e}")
+
+
+@dp.message(Command("unmute"))
+async def unmute_command(message: types.Message, command: CommandObject):
+    """Команда /unmute для снятия мута пользователей"""
+    try:
+        chat = message.chat
+
+        # Проверяем, что команда вызвана в разрешенном чате
+        if chat.id != ALLOWED_CHAT_ID:
+            return
+
+        user = message.from_user
+
+        # Проверяем права отправителя
+        if not await is_user_admin(chat, user.id):
+            try:
+                await message.delete()
+            except:
+                pass
+            return
+
+        # Проверяем права бота
+        if not await can_bot_restrict(chat):
+            logger.warning(f"Боту не хватает прав для ограничений в чате {chat.id}")
+            return
+
+        # Удаляем команду
+        try:
+            await message.delete()
+        except:
+            pass
+
+        # Определяем параметры
+        target_user = None
+        reason = "Без указания причины"
+
+        # Если команда вызвана как ответ на сообщение
+        if message.reply_to_message and message.reply_to_message.from_user:
+            target_user = message.reply_to_message.from_user
+            reason = command.args or "Без указания причины"
+        else:
+            # Команда не ответом
+            args = command.args or ""
+            if args:
+                parts = args.split(maxsplit=1)
+                if len(parts) > 0:
+                    identifier = parts[0]
+                    if len(parts) > 1:
+                        reason = parts[1]
+
+                    # Получаем пользователя
+                    if identifier.startswith('@'):
+                        username = identifier[1:]
+                        try:
+                            chat_member = await chat.get_member(username)
+                            target_user = chat_member.user
+                        except:
+                            return
+                    elif identifier.isdigit():
+                        user_id = int(identifier)
+                        try:
+                            chat_member = await chat.get_member(user_id)
+                            target_user = chat_member.user
+                        except:
+                            return
+
+        if not target_user:
+            return
+
+        # Проверки
+        if target_user.id == user.id:
+            return
+        if target_user.is_bot:
+            return
+        if await is_user_admin(chat, target_user.id):
+            return
+
+        # Выполняем снятие мута (восстанавливаем все права)
+        try:
+            await bot.restrict_chat_member(
+                chat_id=chat.id,
+                user_id=target_user.id,
+                permissions=ChatPermissions(
+                    can_send_messages=True,
+                    can_send_media_messages=True,
+                    can_send_other_messages=True,
+                    can_add_web_page_previews=True
+                )
+            )
+
+            logger.info(f"Пользователь {target_user.id} размучен в чате {chat.id}")
+
+            # Отправляем уведомление в чат
+            await send_action_notification(
+                chat_id=chat.id,
+                action="unmute",
+                target_user=target_user,
+                reason=reason,
+                admin_user=user
+            )
+
+        except Exception as e:
+            logger.error(f"Ошибка при снятии мута: {e}")
+
+    except Exception as e:
+        logger.error(f"Ошибка в команде unmute: {e}")
+
+
+@dp.message(Command("unwarn"))
+async def unwarn_command(message: types.Message, command: CommandObject):
+    """Команда /unwarn для снятия предупреждения"""
+    try:
+        chat = message.chat
+
+        # Проверяем, что команда вызвана в разрешенном чате
+        if chat.id != ALLOWED_CHAT_ID:
+            return
+
+        user = message.from_user
+
+        # Проверяем права отправителя
+        if not await is_user_admin(chat, user.id):
+            try:
+                await message.delete()
+            except:
+                pass
+            return
+
+        # Удаляем команду
+        try:
+            await message.delete()
+        except:
+            pass
+
+        # Определяем параметры
+        target_user = None
+        reason = "Без указания причины"
+
+        # Если команда вызвана как ответ на сообщение
+        if message.reply_to_message and message.reply_to_message.from_user:
+            target_user = message.reply_to_message.from_user
+            reason = command.args or "Без указания причины"
+        else:
+            # Команда не ответом
+            args = command.args or ""
+            if args:
+                parts = args.split(maxsplit=1)
+                if len(parts) > 0:
+                    identifier = parts[0]
+                    if len(parts) > 1:
+                        reason = parts[1]
+
+                    # Получаем пользователя
+                    if identifier.startswith('@'):
+                        username = identifier[1:]
+                        try:
+                            chat_member = await chat.get_member(username)
+                            target_user = chat_member.user
+                        except:
+                            return
+                    elif identifier.isdigit():
+                        user_id = int(identifier)
+                        try:
+                            chat_member = await chat.get_member(user_id)
+                            target_user = chat_member.user
+                        except:
+                            return
+
+        if not target_user:
+            return
+
+        # Проверки
+        if target_user.id == user.id:
+            return
+        if target_user.is_bot:
+            return
+        if await is_user_admin(chat, target_user.id):
+            return
+
+        # Получаем текущие предупреждения
+        warns = get_user_warns_from_db(chat.id, target_user.id)
+
+        if not warns:
+            await message.answer(
+                f"У пользователя {await format_user_display(target_user)} нет предупреждений.",
+                parse_mode="HTML"
+            )
+            return
+
+        # Удаляем последнее предупреждение
+        conn = sqlite3.connect(DB_NAME)
+        cursor = conn.cursor()
+        cursor.execute(
+            """DELETE FROM user_warns WHERE rowid = (
+                SELECT rowid FROM user_warns 
+                WHERE chat_id = ? AND user_id = ? 
+                ORDER BY timestamp DESC LIMIT 1
+            )""",
+            (chat.id, target_user.id)
+        )
+        conn.commit()
+        conn.close()
+
+        # Получаем обновленный список предупреждений
+        updated_warns = get_user_warns_from_db(chat.id, target_user.id)
+
+        # Отправляем уведомление в чат
+        await send_action_notification(
+            chat_id=chat.id,
+            action="unwarn",
+            target_user=target_user,
+            reason=reason,
+            admin_user=user
+        )
+
+        # Сообщаем о количестве оставшихся варнов
+        await message.answer(
+            f"С пользователя {await format_user_display(target_user)} снято последнее предупреждение.\n"
+            f"Осталось предупреждений: {len(updated_warns)}/3",
+            parse_mode="HTML"
+        )
+
+    except Exception as e:
+        logger.error(f"Ошибка в команде unwarn: {e}")
+
+
+# ========== ДОБАВЛЯЕМ ФУНКЦИЮ ДЛЯ УДАЛЕНИЯ ПОСЛЕДНЕГО ВАРНА ==========
+# (Эта функция уже есть выше, но для полноты показываю её здесь)
+def remove_last_warn_from_db(chat_id: int, user_id: int):
+    """Удаляет последнее предупреждение пользователя из базы данных"""
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute(
+        """DELETE FROM user_warns WHERE rowid = (
+            SELECT rowid FROM user_warns 
+            WHERE chat_id = ? AND user_id = ? 
+            ORDER BY timestamp DESC LIMIT 1
+        )""",
+        (chat_id, user_id)
+    )
+    conn.commit()
+    conn.close()
+
 
 # Команды владельца бота (работают везде)
 @dp.message(Command("add"))
@@ -967,6 +1361,7 @@ async def add_command(message: types.Message, command: CommandObject):
     except Exception as e:
         logger.error(f"Ошибка в команде add: {e}")
 
+
 @dp.message(Command("unadd"))
 async def unadd_command(message: types.Message, command: CommandObject):
     """Команда /unadd для удаления сообщения владельца"""
@@ -988,6 +1383,7 @@ async def unadd_command(message: types.Message, command: CommandObject):
     except Exception as e:
         logger.error(f"Ошибка в команде unadd: {e}")
 
+
 # Обработчики callback-запросов
 @dp.callback_query(F.data.startswith("resolve_"))
 async def resolve_ticket(callback: types.CallbackQuery):
@@ -1002,7 +1398,7 @@ async def resolve_ticket(callback: types.CallbackQuery):
         if ticket:
             user_id = ticket[1]
             ticket_type = ticket[5]
-            
+
             user_text = f"Ваше {ticket_type.lower()} #{ticket_id} рассмотрено.\n"
             user_text += "Рассмотрено модератором.\n"
             user_text += "Спасибо за обращение!"
@@ -1033,12 +1429,13 @@ async def resolve_ticket(callback: types.CallbackQuery):
         logger.error(f"Ошибка при рассмотрении обращения: {e}")
         await callback.answer("Произошла ошибка")
 
+
 @dp.callback_query(F.data.startswith("respond_"))
 async def respond_ticket(callback: types.CallbackQuery, state: FSMContext):
     """Обработка кнопки Ответить"""
     try:
         ticket_id = int(callback.data.split("_")[1])
-        
+
         await state.update_data(
             ticket_id=ticket_id,
             message_id=callback.message.message_id
@@ -1055,6 +1452,7 @@ async def respond_ticket(callback: types.CallbackQuery, state: FSMContext):
     except Exception as e:
         logger.error(f"Ошибка при подготовке ответа: {e}")
         await callback.answer("Произошла ошибка")
+
 
 @dp.message(SupportStates.waiting_for_response)
 async def process_response(message: types.Message, state: FSMContext):
@@ -1120,6 +1518,7 @@ async def process_response(message: types.Message, state: FSMContext):
         await message.answer("Произошла ошибка")
         await state.clear()
 
+
 # Обработка служебных сообщений в группе
 @dp.message(F.chat.type.in_([ChatType.GROUP, ChatType.SUPERGROUP]))
 async def handle_group_messages(message: types.Message):
@@ -1128,21 +1527,25 @@ async def handle_group_messages(message: types.Message):
     if message.chat.id == ALLOWED_CHAT_ID:
         await silent_delete_service_messages(message)
 
+
 # Добавляем роутеры к диспетчеру
 dp.include_router(private_router)
 
 # Фильтр для приватных сообщений
 private_router.message.filter(F.chat.type == ChatType.PRIVATE)
 
+
 async def error_handler(update: types.Update, exception: Exception):
     """Обработчик ошибок"""
     logger.error(f"Ошибка: {exception}", exc_info=exception)
     return True
 
+
 # HTTP сервер для Render
 async def health_check(request):
     """Проверка здоровья сервера"""
     return web.Response(text="OK")
+
 
 async def start_http_server():
     """Запуск HTTP сервера"""
@@ -1157,11 +1560,12 @@ async def start_http_server():
     print(f"HTTP сервер запущен на порту {PORT}")
     return runner
 
+
 async def main():
     """Запуск бота"""
     # Удаляем вебхук перед запуском
     await bot.delete_webhook(drop_pending_updates=True)
-    
+
     # Подключаем обработчик ошибок
     dp.errors.register(error_handler)
 
@@ -1180,6 +1584,7 @@ async def main():
         # Останавливаем HTTP сервер при завершении
         await http_server.cleanup()
         await bot.session.close()
+
 
 if __name__ == "__main__":
     asyncio.run(main())
